@@ -2,14 +2,17 @@ import { existsSync, writeFileSync } from "fs";
 import { join } from "path";
 import chalk from "chalk";
 
-const TEMPLATE = `import { defineConfig } from "dockyard";
+const TEMPLATE = `// For autocomplete in TypeScript projects, install dockyard as a dev dependency:
+//   bun add -d dockyard
+// Then uncomment the next line:
+// import type { DacConfig } from "dockyard";
 
-export default defineConfig({
+export default {
   providers: {
     dokploy: {
       type: "dokploy",
       url: process.env.DOKPLOY_URL ?? "https://dokploy.example.com",
-      token: process.env.DOKPLOY_TOKEN ?? "",
+      apiKey: process.env.DOKPLOY_API_KEY ?? "",
     },
   },
 
@@ -27,7 +30,7 @@ export default defineConfig({
       compose: [],
     },
   },
-});
+};
 `;
 
 export async function initCommand(): Promise<void> {

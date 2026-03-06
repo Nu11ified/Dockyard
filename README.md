@@ -1,53 +1,49 @@
 # Dockyard
 
-Dockyard is a CLI tool that manages PaaS infrastructure from a TypeScript config file. You define your projects, applications, databases, and domains in `dac.config.ts`, and the tool creates, updates, or deletes resources to match. It currently supports [Dokploy](https://dokploy.com) as a provider. The provider interface is generic, so other platforms can be added.
+Dockyard is a CLI tool that manages PaaS infrastructure from a config file. You define your projects, applications, databases, and domains in `dac.config.ts`, and the tool creates, updates, or deletes resources on your provider to match. It currently supports [Dokploy](https://dokploy.com). The provider interface is generic, so other platforms can be added.
+
+Your project can be written in any language. The `dac.config.ts` file is just a config that sits in your repo. It does not require Node, npm, or a package.json.
 
 ## Install
 
 Requires [Bun](https://bun.sh).
 
-Add `dockyard` as a dev dependency in your project. This gives you the `dac` CLI and the TypeScript types for your config file.
+### Compiled binary (recommended)
+
+```sh
+git clone https://github.com/Nu11ified/Dockyard.git
+cd Dockyard
+bun install
+bun run build
+```
+
+This produces `./dist/dac`. Copy it somewhere on your PATH:
+
+```sh
+cp ./dist/dac ~/.local/bin/dac
+```
+
+Now you can run `dac` from any project, regardless of language.
+
+### As a project dependency (TypeScript/JavaScript projects)
+
+If your project already uses Bun or Node, you can install dockyard as a dev dependency to get type-checked autocomplete in your config file:
 
 ```sh
 bun add -d dockyard
 ```
 
-This installs the `dac` command, which you can run with `bunx dac` or via package.json scripts.
-
-If the package is not yet published to npm, you can install from source:
-
-```sh
-# clone somewhere on your machine
-git clone https://github.com/Nu11ified/Dockyard.git
-cd Dockyard
-bun install
-
-# link it globally so other projects can use it
-bun link
-
-# then in your project directory
-cd /path/to/your/project
-bun link dockyard
-```
-
-You can also compile a standalone binary:
-
-```sh
-cd Dockyard
-bun run build    # produces ./dist/dac
-```
-
-Copy `./dist/dac` somewhere on your PATH and use it from any project.
+This gives you both the `dac` CLI (via `bunx dac`) and the TypeScript types for your config.
 
 ## Quick start
 
-**1. Go to your project directory and create a config file:**
+**1. Create a config file in your project:**
 
 ```sh
-bunx dac init
+dac init
 ```
 
-This creates `dac.config.ts` in the current directory.
+This creates `dac.config.ts` in the current directory. It works in any project: a Go service, a Python app, a static site, anything.
 
 **2. Set your provider credentials:**
 
@@ -58,12 +54,10 @@ export DOKPLOY_API_KEY="your-api-key"
 
 You can get your API key from the Dokploy dashboard under Settings > API.
 
-**3. Edit `dac.config.ts` to define your infrastructure:**
+**3. Edit `dac.config.ts`:**
 
 ```ts
-import { defineConfig } from "dockyard";
-
-export default defineConfig({
+export default {
   providers: {
     dokploy: {
       type: "dokploy",
@@ -97,25 +91,35 @@ export default defineConfig({
       ],
     },
   },
-});
+};
 ```
 
-The config is validated with Zod at load time. Your editor will provide autocomplete and type errors for all fields.
+No imports needed. The CLI validates the config at runtime.
+
+If you're in a TypeScript project and want autocomplete, install dockyard as a dev dependency and add a type annotation:
+
+```ts
+import type { DacConfig } from "dockyard";
+
+export default {
+  // ... your config
+} satisfies DacConfig;
+```
 
 **4. Preview and apply:**
 
 ```sh
-bunx dac plan     # show what would change
-bunx dac apply    # apply the changes
+dac plan     # show what would change
+dac apply    # apply the changes
 ```
 
-`plan` shows a diff. `apply` shows the same diff and asks for confirmation before making any changes.
+`plan` shows a diff. `apply` shows the same diff and asks for confirmation before making changes.
 
 **5. Deploy:**
 
 ```sh
-bunx dac deploy          # deploy all applications
-bunx dac deploy api      # deploy a specific app
+dac deploy          # deploy all applications
+dac deploy api      # deploy a specific app
 ```
 
 ## Commands
@@ -204,7 +208,8 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
-      - run: bun install
+      # Install dockyard for the dac CLI
+      - run: bun add -d dockyard
 
       # On PRs, just show the plan
       - name: Plan
