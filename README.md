@@ -182,6 +182,10 @@ Top-level config also supports `certificates` and `registries` arrays.
 
 ## GitHub Actions
 
+Since `dac.config.ts` is just TypeScript, it can read `process.env` directly. Any environment variable you set in your GitHub Actions workflow is available in your config. This means you can store secrets (API keys, database passwords, tokens) in GitHub and have them flow into your Dokploy deployments without hardcoding anything.
+
+### Basic setup
+
 Create `.github/workflows/deploy.yml`:
 
 ```yaml
@@ -206,6 +210,8 @@ jobs:
         env:
           DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          STRIPE_KEY: ${{ secrets.STRIPE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Apply
         if: github.event_name == 'push'
@@ -213,6 +219,8 @@ jobs:
         env:
           DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          STRIPE_KEY: ${{ secrets.STRIPE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Deploy
         if: github.event_name == 'push'
@@ -222,9 +230,116 @@ jobs:
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
 ```
 
-Add `DOKPLOY_URL` and `DOKPLOY_API_KEY` to your repository secrets.
+Then in your config, reference them:
 
-On pull requests, the workflow runs `dac plan` so you can review changes. On push to main, it applies and deploys.
+```ts
+applications: [{
+  name: "api",
+  // ...
+  env: {
+    STRIPE_KEY: process.env.STRIPE_KEY!,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
+  },
+}],
+```
+
+Add your secrets in your GitHub repo under Settings > Secrets and variables > Actions.
+
+### Scoped environments (staging / production)
+
+GitHub Actions has an [environments](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) feature that lets you define separate sets of secrets per environment. Each environment gets its own secrets, so `STRIPE_KEY` in staging can be a test key while production uses the live key.
+
+```yaml
+name: Deploy
+
+on:
+  push:
+    branches: [main, develop]
+
+jobs:
+  staging:
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Apply staging
+        run: bunx dockyard-cli apply --auto-approve
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          STRIPE_KEY: ${{ secrets.STRIPE_KEY }}
+          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+          APP_ENV: staging
+      - name: Deploy staging
+        run: bunx dockyard-cli deploy
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+
+  production:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Apply production
+        run: bunx dockyard-cli apply --auto-approve
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          STRIPE_KEY: ${{ secrets.STRIPE_KEY }}
+          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+          APP_ENV: production
+      - name: Deploy production
+        run: bunx dockyard-cli deploy
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+```
+
+Your config can then branch on `APP_ENV` or use different providers per environment:
+
+```ts
+export default {
+  providers: {
+    staging: {
+      type: "dokploy",
+      url: process.env.DOKPLOY_URL!,
+      apiKey: process.env.DOKPLOY_API_KEY!,
+    },
+  },
+
+  project: { name: "my-app" },
+
+  environments: {
+    [process.env.APP_ENV ?? "staging"]: {
+      provider: "staging",
+      applications: [{
+        name: "api",
+        source: { type: "github", repo: "myorg/api", branch: "main", owner: "myorg" },
+        build: { type: "dockerfile" },
+        env: {
+          NODE_ENV: process.env.APP_ENV ?? "staging",
+          STRIPE_KEY: process.env.STRIPE_KEY!,
+          DATABASE_PASSWORD: process.env.DATABASE_PASSWORD!,
+        },
+      }],
+    },
+  },
+};
+```
+
+To set this up:
+
+1. Go to your GitHub repo > Settings > Environments
+2. Create `staging` and `production` environments
+3. Add secrets to each (same key names, different values)
+4. Push to `develop` to deploy staging, push to `main` to deploy production
+
+The same config file handles both. The secrets are different per environment because GitHub injects the right set based on the `environment:` field in the workflow.
 
 The `.dac/state.json` file should be committed to your repo so CI knows what resources are already managed.
 
