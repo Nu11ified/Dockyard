@@ -3,9 +3,9 @@ import { join } from "path";
 import chalk from "chalk";
 
 const TEMPLATE = `// For autocomplete in TypeScript projects, install dockyard as a dev dependency:
-//   bun add -d dockyard
+//   bun add -d dockyard-cli
 // Then uncomment the next line:
-// import type { DacConfig } from "dockyard";
+// import type { DacConfig } from "dockyard-cli";
 
 export default {
   providers: {

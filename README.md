@@ -2,38 +2,33 @@
 
 Dockyard is a CLI tool that manages PaaS infrastructure from a config file. You define your projects, applications, databases, and domains in `dac.config.ts`, and the tool creates, updates, or deletes resources on your provider to match. It currently supports [Dokploy](https://dokploy.com). The provider interface is generic, so other platforms can be added.
 
-Your project can be written in any language. The `dac.config.ts` file is just a config that sits in your repo. It does not require Node, npm, or a package.json.
+Your project can be written in any language. The `dac.config.ts` file is just a config that sits in your repo.
 
 ## Install
 
 Requires [Bun](https://bun.sh).
 
-### Compiled binary (recommended)
+```sh
+bun add -g dockyard-cli
+```
+
+That's it. You now have the `dac` command available everywhere.
+
+If you don't want a global install, you can use `bunx` to run it without installing:
+
+```sh
+bunx dockyard-cli init
+bunx dockyard-cli plan
+bunx dockyard-cli apply
+```
+
+Or build from source:
 
 ```sh
 git clone https://github.com/Nu11ified/Dockyard.git
-cd Dockyard
-bun install
-bun run build
+cd Dockyard && bun install && bun run build
+cp dist/dac ~/.local/bin/
 ```
-
-This produces `./dist/dac`. Copy it somewhere on your PATH:
-
-```sh
-cp ./dist/dac ~/.local/bin/dac
-```
-
-Now you can run `dac` from any project, regardless of language.
-
-### As a project dependency (TypeScript/JavaScript projects)
-
-If your project already uses Bun or Node, you can install dockyard as a dev dependency to get type-checked autocomplete in your config file:
-
-```sh
-bun add -d dockyard
-```
-
-This gives you both the `dac` CLI (via `bunx dac`) and the TypeScript types for your config.
 
 ## Quick start
 
@@ -43,7 +38,7 @@ This gives you both the `dac` CLI (via `bunx dac`) and the TypeScript types for 
 dac init
 ```
 
-This creates `dac.config.ts` in the current directory. It works in any project: a Go service, a Python app, a static site, anything.
+This creates `dac.config.ts` in the current directory. It works in any project: Go, Python, Rust, a static site, anything.
 
 **2. Set your provider credentials:**
 
@@ -96,16 +91,6 @@ export default {
 
 No imports needed. The CLI validates the config at runtime.
 
-If you're in a TypeScript project and want autocomplete, install dockyard as a dev dependency and add a type annotation:
-
-```ts
-import type { DacConfig } from "dockyard";
-
-export default {
-  // ... your config
-} satisfies DacConfig;
-```
-
 **4. Preview and apply:**
 
 ```sh
@@ -113,14 +98,32 @@ dac plan     # show what would change
 dac apply    # apply the changes
 ```
 
-`plan` shows a diff. `apply` shows the same diff and asks for confirmation before making changes.
-
 **5. Deploy:**
 
 ```sh
 dac deploy          # deploy all applications
 dac deploy api      # deploy a specific app
 ```
+
+### TypeScript autocomplete (optional)
+
+If you want autocomplete and type checking in your config, add dockyard-cli as a dev dependency in a JS/TS project:
+
+```sh
+bun add -d dockyard-cli
+```
+
+Then add a type annotation to your config:
+
+```ts
+import type { DacConfig } from "dockyard-cli";
+
+export default {
+  // full autocomplete here
+} satisfies DacConfig;
+```
+
+This is optional. The config works without it.
 
 ## Commands
 
@@ -158,7 +161,7 @@ dac deploy api      # deploy a specific app
 
 `postgres`, `mysql`, `mariadb`, `redis`, `mongo`
 
-Each takes `name`, `type`, and an optional `version`. Credentials (databaseUser, databasePassword, etc.) are auto-generated if not specified.
+Each takes `name`, `type`, and an optional `version`. Credentials are auto-generated if not specified.
 
 ### Resource references
 
@@ -173,23 +176,13 @@ env: {
 
 ### Other resource types
 
-Applications can also include:
-
-- `domains` - custom domains with optional HTTPS
-- `ports` - port mappings (host port auto-assigned if omitted)
-- `mounts` - bind mounts, volumes, or file mounts
-- `redirects` - regex-based URL redirects
-- `security` - basic auth credentials
-- `resources` - CPU/memory limits and reservations
-- `replicas` - number of replicas
+Applications can also include: `domains`, `ports`, `mounts`, `redirects`, `security`, `resources` (CPU/memory), `replicas`.
 
 Top-level config also supports `certificates` and `registries` arrays.
 
 ## GitHub Actions
 
-You can run Dockyard in CI to automatically apply infrastructure changes on push.
-
-Create `.github/workflows/deploy.yml` in your repo:
+Create `.github/workflows/deploy.yml`:
 
 ```yaml
 name: Deploy
@@ -205,47 +198,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: oven-sh/setup-bun@v2
 
-      # Install dockyard for the dac CLI
-      - run: bun add -d dockyard
-
-      # On PRs, just show the plan
       - name: Plan
         if: github.event_name == 'pull_request'
-        run: bunx dac plan
+        run: bunx dockyard-cli plan
         env:
           DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
 
-      # On push to main, apply and deploy
       - name: Apply
         if: github.event_name == 'push'
-        run: bunx dac apply --auto-approve
+        run: bunx dockyard-cli apply --auto-approve
         env:
           DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
 
       - name: Deploy
         if: github.event_name == 'push'
-        run: bunx dac deploy
+        run: bunx dockyard-cli deploy
         env:
           DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
 ```
 
-Add `DOKPLOY_URL` and `DOKPLOY_API_KEY` to your repository secrets (Settings > Secrets and variables > Actions).
+Add `DOKPLOY_URL` and `DOKPLOY_API_KEY` to your repository secrets.
 
-On pull requests, the workflow runs `dac plan` so you can see what would change. On push to main, it runs `dac apply --auto-approve` followed by `dac deploy`.
+On pull requests, the workflow runs `dac plan` so you can review changes. On push to main, it applies and deploys.
 
-Note: the `.dac/state.json` file needs to be committed to your repo for this to work, since the state tracks what resources Dockyard manages. Add and commit it after your first `dac apply`.
+The `.dac/state.json` file should be committed to your repo so CI knows what resources are already managed.
 
 ## How it works
 
-Dockyard keeps a local state file at `.dac/state.json` that maps config resource names to remote IDs on the provider. When you run `dac plan` or `dac apply`, it compares your config against this state and produces a diff of creates, updates, and deletes. Resources are applied in dependency order: projects first, then environments, then databases, then applications.
+Dockyard keeps a state file at `.dac/state.json` that maps config resource names to remote IDs. On `dac plan` or `dac apply`, it diffs your config against this state and produces creates, updates, and deletes. Resources are applied in dependency order: projects, then environments, then databases, then applications.
 
-The state file should be committed to your repo. This is how Dockyard knows which remote resources it manages and avoids recreating things that already exist.
+Commit the state file to your repo. This is how Dockyard tracks what it manages.
 
 ## Development
 
