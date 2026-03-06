@@ -15,3 +15,4 @@ export type {
   DeploymentResult,
   Provider,
 } from "./provider";
+export { DokployClient, DokployProvider } from "./dokploy/index.js";
