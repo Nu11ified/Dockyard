@@ -1,2 +1,3 @@
-#!/usr/bin/env bun
-console.log("dac - deploy as code");
+export { defineConfig } from "./types/config";
+export type { DacConfig } from "./types/config";
+export type { Provider } from "./providers/provider";
