@@ -2,7 +2,7 @@ import { existsSync, writeFileSync } from "fs";
 import { join } from "path";
 import chalk from "chalk";
 
-const TEMPLATE = `import { defineConfig } from "dokploy-as-code";
+const TEMPLATE = `import { defineConfig } from "dockyard";
 
 export default defineConfig({
   providers: {
@@ -15,7 +15,7 @@ export default defineConfig({
 
   project: {
     name: "my-project",
-    description: "Managed by DAC",
+    description: "Managed by Dockyard",
   },
 
   environments: {

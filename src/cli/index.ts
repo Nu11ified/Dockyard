@@ -12,7 +12,7 @@ export function createCli(): Command {
 
   program
     .name("dac")
-    .description("Dokploy as Code — manage infrastructure declaratively")
+    .description("Dockyard — platform-agnostic infrastructure as code for PaaS")
     .version("0.1.0");
 
   program
