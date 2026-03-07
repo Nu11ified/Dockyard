@@ -49,6 +49,14 @@ export DOKPLOY_API_KEY="your-api-key"
 
 You can get your API key from the Dokploy dashboard under Settings > API.
 
+**Railway:**
+
+```sh
+export RAILWAY_TOKEN="your-railway-api-token"
+```
+
+Get your token from the [Railway dashboard](https://railway.com/account/tokens).
+
 **3. Edit `dac.config.ts`:**
 
 ```ts
@@ -90,6 +98,8 @@ export default {
 ```
 
 No imports needed. The CLI validates the config at runtime.
+
+> **Note:** Railway is also supported as a provider. Use `type: "railway"` with a `token` field (and optional `teamId`) instead of the Dokploy provider shown above.
 
 **4. Preview and apply:**
 
@@ -140,6 +150,11 @@ This is optional. The config works without it.
 
 ## Configuration reference
 
+### Provider types
+
+- `dokploy` — Self-hosted Dokploy instance. Requires `url` and `apiKey`.
+- `railway` — Railway.com. Requires `token`. Optional `teamId` for workspace scoping.
+
 ### Source types
 
 - `github` - repo, branch, owner, buildPath, watchPaths, triggerType
@@ -179,6 +194,23 @@ env: {
 Applications can also include: `domains`, `ports`, `mounts`, `redirects`, `security`, `resources` (CPU/memory), `replicas`.
 
 Top-level config also supports `certificates` and `registries` arrays.
+
+### Platform differences
+
+Not all features are available on every provider:
+
+| Feature | Dokploy | Railway |
+|---|---|---|
+| Applications | Yes | Yes |
+| Databases | Yes | Yes (auto-created as services) |
+| Compose | Yes | No |
+| Domains | Yes | Yes (SSL automatic) |
+| Mounts/Volumes | Yes | Yes |
+| Redirects | Yes | No |
+| Basic auth | Yes | No |
+| Manual certificates | Yes | No (SSL automatic) |
+
+Using an unsupported feature with a provider that doesn't support it will produce an error during `dac plan`.
 
 ## GitHub Actions
 
