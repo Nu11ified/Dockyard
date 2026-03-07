@@ -21,7 +21,15 @@ export function createProvider(name: string, providerConfig: { type: string; [ke
     const apiKey = (providerConfig.token as string) ?? (providerConfig.apiKey as string) ?? "";
     return new DokployProvider(name, url, apiKey);
   }
-  throw new Error(`Unknown provider type: "${providerConfig.type}". Supported types: dokploy`);
+  if (providerConfig.type === "railway") {
+    const { RailwayProvider } = require("../providers/railway") as {
+      RailwayProvider: new (name: string, token: string, teamId?: string) => Provider;
+    };
+    const token = (providerConfig.token as string) ?? "";
+    const teamId = providerConfig.teamId as string | undefined;
+    return new RailwayProvider(name, token, teamId);
+  }
+  throw new Error(`Unknown provider type: "${providerConfig.type}". Supported types: dokploy, railway`);
 }
 
 export async function buildPlan(cwd: string = process.cwd()): Promise<BuildPlanResult> {
