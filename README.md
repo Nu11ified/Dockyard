@@ -1,6 +1,6 @@
 # Dockyard
 
-Dockyard is a CLI tool that manages PaaS infrastructure from a config file. You define your projects, applications, databases, and domains in `dac.config.ts`, and the tool creates, updates, or deletes resources on your provider to match. It currently supports [Dokploy](https://dokploy.com). The provider interface is generic, so other platforms can be added.
+Dockyard is a CLI tool that manages PaaS infrastructure from a config file. You define your projects, applications, databases, and domains in `dac.config.ts`, and the tool creates, updates, or deletes resources on your provider to match. It currently supports [Dokploy](https://dokploy.com) and [Railway](https://railway.com). The provider interface is generic, so other platforms can be added.
 
 Your project can be written in any language. The `dac.config.ts` file is just a config that sits in your repo.
 
@@ -42,12 +42,14 @@ This creates `dac.config.ts` in the current directory. It works in any project: 
 
 **2. Set your provider credentials:**
 
+**Dokploy:**
+
 ```sh
 export DOKPLOY_URL="https://your-dokploy-instance.com"
 export DOKPLOY_API_KEY="your-api-key"
 ```
 
-You can get your API key from the Dokploy dashboard under Settings > API.
+Get your API key from the Dokploy dashboard under Settings > API.
 
 **Railway:**
 
@@ -99,7 +101,19 @@ export default {
 
 No imports needed. The CLI validates the config at runtime.
 
-> **Note:** Railway is also supported as a provider. Use `type: "railway"` with a `token` field (and optional `teamId`) instead of the Dokploy provider shown above.
+To use Railway instead, swap the provider:
+
+```ts
+providers: {
+  railway: {
+    type: "railway",
+    token: process.env.RAILWAY_TOKEN!,
+    teamId: "optional-workspace-id",  // optional
+  },
+},
+```
+
+The rest of the config (applications, databases, domains) stays the same. See [Platform differences](#platform-differences) for what each provider supports.
 
 **4. Preview and apply:**
 
@@ -214,7 +228,7 @@ Using an unsupported feature with a provider that doesn't support it will produc
 
 ## GitHub Actions
 
-Since `dac.config.ts` is just TypeScript, it can read `process.env` directly. Any environment variable you set in your GitHub Actions workflow is available in your config. This means you can store secrets (API keys, database passwords, tokens) in GitHub and have them flow into your Dokploy deployments without hardcoding anything.
+Since `dac.config.ts` is just TypeScript, it can read `process.env` directly. Any environment variable you set in your GitHub Actions workflow is available in your config. This means you can store secrets (API keys, database passwords, tokens) in GitHub and have them flow into your deployments without hardcoding anything.
 
 ### Basic setup
 
@@ -320,49 +334,70 @@ jobs:
       - name: Apply production
         run: bunx dockyard-cli apply --auto-approve
         env:
-          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           STRIPE_KEY: ${{ secrets.STRIPE_KEY }}
           DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
           APP_ENV: production
       - name: Deploy production
         run: bunx dockyard-cli deploy
         env:
-          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 ```
 
-Your config can then branch on `APP_ENV` or use different providers per environment:
+Your config can then branch on `APP_ENV` or use different providers per environment. For example, Dokploy for staging and Railway for production:
 
 ```ts
 export default {
   providers: {
-    staging: {
+    dokploy: {
       type: "dokploy",
       url: process.env.DOKPLOY_URL!,
       apiKey: process.env.DOKPLOY_API_KEY!,
+    },
+    railway: {
+      type: "railway",
+      token: process.env.RAILWAY_TOKEN!,
     },
   },
 
   project: { name: "my-app" },
 
   environments: {
-    [process.env.APP_ENV ?? "staging"]: {
-      provider: "staging",
+    staging: {
+      provider: "dokploy",
+      applications: [{
+        name: "api",
+        source: { type: "github", repo: "myorg/api", branch: "develop", owner: "myorg" },
+        build: { type: "dockerfile" },
+        env: {
+          NODE_ENV: "staging",
+          STRIPE_KEY: process.env.STRIPE_KEY!,
+        },
+      }],
+      databases: [
+        { name: "postgres", type: "postgres", version: "16" },
+      ],
+    },
+    production: {
+      provider: "railway",
       applications: [{
         name: "api",
         source: { type: "github", repo: "myorg/api", branch: "main", owner: "myorg" },
         build: { type: "dockerfile" },
         env: {
-          NODE_ENV: process.env.APP_ENV ?? "staging",
+          NODE_ENV: "production",
           STRIPE_KEY: process.env.STRIPE_KEY!,
-          DATABASE_PASSWORD: process.env.DATABASE_PASSWORD!,
         },
       }],
+      databases: [
+        { name: "postgres", type: "postgres", version: "16" },
+      ],
     },
   },
 };
 ```
+
+The same database and application config works on both providers. Dockyard handles the platform-specific translation.
 
 To set this up:
 
